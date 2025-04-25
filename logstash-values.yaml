@@ -1,0 +1,90 @@
+logstashPipeline:
+  logstash.conf: |
+    input {
+      beats {
+        port => 5044
+      }
+    }
+    filter {
+      if [message] =~ "^{.*}$" {
+        # Check if the message looks like a JSON string
+        json {
+          source => "message"
+          target => "parsed_json"
+          add_tag => ["json_parsed"]
+          remove_field => ["message"]
+        }
+      }
+      else {
+        mutate {
+          add_tag => ["non_json"]
+        }
+      }
+    }
+    output {
+      if "getweatherservice" in [tags] {
+        elasticsearch {
+          index => "getweatherservice-%{+MM-dd-yyyy}"
+          hosts => "http://13.233.236.81:9200"
+          user => "${ES_USERNAME}"
+          password => "${ES_PASSWORD}"
+        }
+      }
+      else if "recomendation-service" in [tags] {
+        elasticsearch {
+          index => "recomendation-service-%{+MM-dd-yyyy}"
+          hosts => "http://13.233.236.81:9200"
+          user => "${ES_USERNAME}"
+          password => "${ES_PASSWORD}"
+        }
+      }
+      else if "dbope-service" in [tags] {
+        elasticsearch {
+          index => "dbope-service-%{+MM-dd-yyyy}"
+          hosts => "http://13.233.236.81:9200"
+          user => "${ES_USERNAME}"
+          password => "${ES_PASSWORD}"
+        }
+      }
+      else if "frontend" in [tags] {
+        elasticsearch {
+          index => "frontend-%{+MM-dd-yyyy}"
+          hosts => "http://13.233.236.81:9200"
+          user => "${ES_USERNAME}"
+          password => "${ES_PASSWORD}"
+        }
+      }
+    }
+
+extraEnvs:
+  - name: ES_USERNAME
+    valueFrom:
+      secretKeyRef:
+        name: elasticsearch-creds
+        key: username
+  - name: ES_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: elasticsearch-creds
+        key: password
+
+service:
+  annotations: {}
+  type: ClusterIP
+  ports:
+    - name: beats
+      port: 5044
+      protocol: TCP
+      targetPort: 5044
+    - name: http
+      port: 8080
+      protocol: TCP
+      targetPort: 8080
+
+resources:
+  requests:
+    cpu: "100m"
+    memory: "800Mi"
+  limits:
+    cpu: "400m"
+    memory: "1536Mi"
